@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+training/raw/
+data/debug.json
+.venv/
+
+training-run.log
+public/
