@@ -1,0 +1,41 @@
+name: Import pinned PLACE research inputs
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/import-data.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download immutable public source data
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from urllib.request import urlopen
+          import gzip,json
+          sets = [
+            ('kkongt2/betkj2','1d44a6972fc7d83250ce4e0baff7ad6bbb845f82',['training/history-v7.jsonl.gz','training/manifest.json','data/latest.json','data/history-context-v7.json.gz']),
+            ('kkongt2/timeline','9aa198e7e1634a08ca98cb6af99bea1d4a396679',['training/payouts.json.gz','training/payout-quality.json'])
+          ]
+          for repo,sha,files in sets:
+            for f in files:
+              p=Path(f);p.parent.mkdir(parents=True,exist_ok=True)
+              b=urlopen(f'https://raw.githubusercontent.com/{repo}/{sha}/{f}',timeout=60).read()
+              if f.endswith('.gz'): gzip.decompress(b)
+              else: json.loads(b)
+              p.write_bytes(b)
+          Path('training/provenance.json').write_text(json.dumps(sets,indent=2))
+          PY
+      - name: Preserve inputs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add training data
+          if ! git diff --cached --quiet; then
+            git commit -m "Import immutable history and verified PLACE payout targets"
+            git push origin HEAD:main
+          fi
